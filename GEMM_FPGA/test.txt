@@ -1,0 +1,14 @@
+Error: Could not load board library /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libMPF.so (error_msg: /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libMPF.so: cannot open shared object file: No such file or directory)
+Failed to dynamically load board MMD /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libMPF.so
+Error: Could not load board library /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libintel_opae_mmd.so (error_msg: /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libintel_opae_mmd.so: cannot open shared object file: No such file or directory)
+Failed to dynamically load board MMD /ofs_install/ofs/n6001/2023.3/oneapi-asp/n6001/linux64/lib/libintel_opae_mmd.so
+Running on device: Intel(R) FPGA Emulation Device
+ Matrix A size: 64 x 64 (tile: 8 x 64)
+ Matrix B size: 64 x 64 (tile: 64 x 8)
+ Systolic array size: 8 x 8 PEs
+ Data Type: float4
+Running matrix multiplication of 2 matrices 1 times
+   Total duration:   0.460152 s
+Throughput: 0.00434639k matrices/s
+
+PASSED

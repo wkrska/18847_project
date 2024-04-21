@@ -54,7 +54,8 @@ void MatmulImpl(sycl::queue &q,            // Device queue
 ) {
   // Number of elements per DDR access
   // NOTE: optimized for single-precision floating-point matrices
-  constexpr int kElemsPerDDRAccess = 8;
+  constexpr int kElemsPerDDRAccess = 8 * sizeof(TT) / 4;
+  // constexpr int kElemsPerDDRAccess = 8;
 
   // Matrix sizes
   constexpr int kMatsizeA = rows_a * common;
@@ -90,10 +91,11 @@ void MatmulImpl(sycl::queue &q,            // Device queue
   using PipeDataC = fpga_tools::NTuple<TT, tile_a>;
 
   // Pipes to communicate the matrices between kernels
-  using PipeA = sycl::ext::intel::pipe<APipe, PipeDataA, 64>;
-  using PipeB = sycl::ext::intel::pipe<BPipe, PipeDataB, 64>;
-  using PipeC = sycl::ext::intel::pipe<CPipe, PipeDataC, 64>;
-  using PipeDone = sycl::ext::intel::pipe<DonePipe, bool, 64>;
+  constexpr int dfltPipeDepth = 16;
+  using PipeA = sycl::ext::intel::pipe<APipe, PipeDataA, dfltPipeDepth>;
+  using PipeB = sycl::ext::intel::pipe<BPipe, PipeDataB, dfltPipeDepth>;
+  using PipeC = sycl::ext::intel::pipe<CPipe, PipeDataC, dfltPipeDepth>;
+  using PipeDone = sycl::ext::intel::pipe<DonePipe, bool, dfltPipeDepth>;
 
   // Producer kernel for matrix A
   auto feeder_a_event = q.single_task<FeederA>(

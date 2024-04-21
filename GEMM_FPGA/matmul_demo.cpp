@@ -7,20 +7,39 @@
 #include "exception_handler.hpp"
 #include "matmul.hpp"
 
+// Select datatype
+#if DWIDTH == 64
+  typedef double myType;
+#elif DWIDTH == 32
+  typedef float myType;
+// #elif DWIDTH == 16
+//   #include <sycl/ext/intel/ac_types/ap_float.hpp>
+//   #include <sycl/ext/intel/ac_types/ap_float_math.hpp>
+//   typedef ihc::bfloat16 myType;
+#elif DWIDTH == 16
+  typedef short myType;
+#elif DWIDTH == 8
+  typedef char myType;
+#else
+  #include <sycl/ext/intel/ac_types/ac_int.hpp>
+  typedef ac_int<(int) DWIDTH, false> myType;
+#endif
+
+
 // Fills a matrix with random numbers within the range [l_bound, u_bound).
-void FillRand(std::vector<float> &m_matrix, int l_bound, int u_bound,
+void FillRand(std::vector<myType> &m_matrix, int l_bound, int u_bound,
               int elements) {
   for (int element = 0; element < elements; element++) {
     m_matrix[element] =
-        static_cast<float>(rand()) /
-            (static_cast<float>((RAND_MAX) / (u_bound - l_bound))) +
+        static_cast<myType>(rand()) /
+            (static_cast<myType>((RAND_MAX) / (u_bound - l_bound))) +
         l_bound;
   }
 }
 
 // Compares num_matrices pairs of matrices; returns true iff they are equal
 // given a tolerated error bound.
-bool EqualMat(std::vector<float> &c_matrix, std::vector<float> &c_reference,
+bool EqualMat(std::vector<myType> &c_matrix, std::vector<myType> &c_reference,
               int rows, int cols, int num_matrices) {
   int matsize = rows * cols;
   bool passed = true;
@@ -32,7 +51,7 @@ bool EqualMat(std::vector<float> &c_matrix, std::vector<float> &c_reference,
     for (int col = 0; col < cols; col++) {
       for (int row = 0; row < rows; row++) {
         int idx = matrix_idx * matsize + col * rows + row;
-        if (abs(c_matrix[idx] - c_reference[idx]) > kEpsilon) {
+        if (abs((double) c_matrix[idx] - (double) c_reference[idx]) > kEpsilon) {
           passed = false;
 #if DEBUG
           std::cout << "Error: C[" << col << "][" << row << "] = "
@@ -41,7 +60,7 @@ bool EqualMat(std::vector<float> &c_matrix, std::vector<float> &c_reference,
                     << c_reference[idx] << std::endl;
 #endif
         }
-        if (!std::isfinite(c_matrix[idx])) {
+        if (!std::isfinite((double) c_matrix[idx])) {
           passed = false;
 #if DEBUG
           std::cout << "C[" << col << "][" << row << "] = " << c_matrix[idx]
@@ -55,7 +74,7 @@ bool EqualMat(std::vector<float> &c_matrix, std::vector<float> &c_reference,
 }
 
 // Output a matrix to the screen (assumes column-major format).
-void PrintMat(std::vector<float> &m_matrix, int rows, int cols) {
+void PrintMat(std::vector<myType> &m_matrix, int rows, int cols) {
   for (int row = 0; row < rows; row++) {
     for (int col = 0; col < cols; col++) {
       // Copy old state of cout
@@ -77,8 +96,8 @@ void PrintMat(std::vector<float> &m_matrix, int rows, int cols) {
 
 // Transpose num_matrices matrices in m_matrix and store the results in
 // m_transposed.
-void TransposeMat(std::vector<float> &m_matrix,
-                  std::vector<float> &m_transposed, int rows, int cols,
+void TransposeMat(std::vector<myType> &m_matrix,
+                  std::vector<myType> &m_transposed, int rows, int cols,
                   int num_matrices) {
   int matsize = rows * cols;
 
@@ -94,8 +113,8 @@ void TransposeMat(std::vector<float> &m_matrix,
 
 // Multiply num_matrices pairs of matrices from a_matrix and b_matrix and store
 // all the results in c_matrix.
-void MatmulRef(std::vector<float> &a_matrix, std::vector<float> &b_matrix,
-               std::vector<float> &c_matrix, int rows_a, int common, int cols_b,
+void MatmulRef(std::vector<myType> &a_matrix, std::vector<myType> &b_matrix,
+               std::vector<myType> &c_matrix, int rows_a, int common, int cols_b,
                int num_matrices) {
   int matsize_a = rows_a * common;
   int matsize_b = cols_b * common;
@@ -104,7 +123,7 @@ void MatmulRef(std::vector<float> &a_matrix, std::vector<float> &b_matrix,
   for (int matrix_idx = 0; matrix_idx < num_matrices; matrix_idx++) {
     for (int col = 0; col < cols_b; col++) {
       for (int row = 0; row < rows_a; row++) {
-        float sum = 0;
+        myType sum = 0;
         for (int k = 0; k < common; k++) {
           sum += a_matrix[matrix_idx * matsize_a + k * rows_a + row] *
                  b_matrix[matrix_idx * matsize_b + col * common + k];
@@ -117,11 +136,12 @@ void MatmulRef(std::vector<float> &a_matrix, std::vector<float> &b_matrix,
 
 int main(int argc, char *argv[]) {
   // Matrix paramters specified by build system
-  constexpr int kRowsA = ROWS_A;
-  constexpr int kCommon = COMMON;
-  constexpr int kColsB = COLS_B;
+  constexpr int kRowsA = MATDIM;
+  constexpr int kCommon = MATDIM;
+  constexpr int kColsB = MATDIM;
   constexpr int kTileA = TILE_A;
   constexpr int kTileB = TILE_B;
+  constexpr int kDWidth = DWIDTH;
 
   // Matrix sizes
   constexpr int kMatsizeA = kRowsA * kCommon;
@@ -161,9 +181,9 @@ int main(int argc, char *argv[]) {
             << std::endl;
 
   // Create arrays to hold the input and output matrices
-  std::vector<float> a_matrix(kMatsizeA * kNumMatrices);
-  std::vector<float> b_matrix(kMatsizeB * kNumMatrices);
-  std::vector<float> c_matrix(kMatsizeC * kNumMatrices);
+  std::vector<myType> a_matrix(kMatsizeA * kNumMatrices);
+  std::vector<myType> b_matrix(kMatsizeB * kNumMatrices);
+  std::vector<myType> c_matrix(kMatsizeC * kNumMatrices);
 
   // Generate random A and B matrices
   constexpr int kRandMin = 1;
@@ -176,8 +196,8 @@ int main(int argc, char *argv[]) {
   // NOTE: since the systolic matrix multiply interprets B as transposed, we
   // need to first transpose b_matrix to b_transposed to use it in the standard
   // MM algorithm
-  std::vector<float> b_transposed(kMatsizeB * kNumMatrices);
-  std::vector<float> c_reference(kMatsizeC * kNumMatrices);
+  std::vector<myType> b_transposed(kMatsizeB * kNumMatrices);
+  std::vector<myType> c_reference(kMatsizeC * kNumMatrices);
   TransposeMat(b_matrix, b_transposed, kColsB, kCommon, kNumMatrices);
   MatmulRef(a_matrix, b_transposed, c_reference, kRowsA, kCommon, kColsB,
             kNumMatrices);
@@ -186,14 +206,15 @@ int main(int argc, char *argv[]) {
             << " (tile: " << kTileA << " x " << kCommon << ")" << std::endl
             << " Matrix B size: " << kCommon << " x " << kColsB
             << " (tile: " << kCommon << " x " << kTileB << ")" << std::endl
-            << " Systolic array size: " << kTileA << " x " << kTileB << " PEs"
+            << " Systolic array size: " << kTileA << " x " << kTileB << " PEs" << std::endl
+            << " Data Type: float" << kDWidth
             << std::endl;
   std::cout << "Running matrix multiplication of " << kNumMatrices
             << ((kNumMatrices > 1) ? " matrices " : " matrix ") << repetitions
             << " times" << std::endl;
 
   // Run the matrix multiplication
-  MatmulImpl<float, kRowsA, kCommon, kColsB, kTileA, kTileB, kNumMatrices>(
+  MatmulImpl<myType, kRowsA, kCommon, kColsB, kTileA, kTileB, kNumMatrices>(
       q, a_matrix, b_matrix, c_matrix, repetitions);
 
 #if DEBUG
@@ -202,25 +223,25 @@ int main(int argc, char *argv[]) {
     std::cout << std::endl << matrix_idx << std::endl;
 
     std::cout << std::endl << "Matrix A" << std::endl;
-    std::vector<float> a_vector = {
+    std::vector<myType> a_vector = {
         a_matrix.begin() + matrix_idx * kMatsizeA,
         a_matrix.begin() + (matrix_idx + 1) * kMatsizeA};
     PrintMat(a_vector, kRowsA, kCommon);
 
     std::cout << std::endl << "Matrix B" << std::endl;
-    std::vector<float> b_vector = {
+    std::vector<myType> b_vector = {
         b_transposed.begin() + matrix_idx * kMatsizeB,
         b_transposed.begin() + (matrix_idx + 1) * kMatsizeB};
     PrintMat(b_vector, kCommon, kColsB);
 
     std::cout << std::endl << "Matrix C reference" << std::endl;
-    std::vector<float> c_ref_vector = {
+    std::vector<myType> c_ref_vector = {
         c_reference.begin() + matrix_idx * kMatsizeC,
         c_reference.begin() + (matrix_idx + 1) * kMatsizeC};
     PrintMat(c_ref_vector, kRowsA, kColsB);
 
     std::cout << std::endl << "Matrix C calculated" << std::endl;
-    std::vector<float> c_vector = {
+    std::vector<myType> c_vector = {
         c_matrix.begin() + matrix_idx * kMatsizeC,
         c_matrix.begin() + (matrix_idx + 1) * kMatsizeC};
     PrintMat(c_vector, kRowsA, kColsB);

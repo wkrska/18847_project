@@ -1,33 +1,22 @@
-TIMERUN = -DTIMERUN=0
+VERSION = v1
 
-VERSION = v8
-
-AGGF = build/agg_$(VERSION)_fpgaG$(PP)$(RR)$(CC)$(LL)$(TIMERUN)_$(SEED)_$(MHZ)
-AGGP = build/agg_$(VERSION)_vTune$(PP)$(RR)$(CC)$(LL)$(TIMERUN)_$(SEED)_$(MHZ)
-AGGH = build/agg_$(VERSION)_hw$(PP)$(RR)$(CC)$(LL)$(TIMERUN)_$(SEED)_$(MHZ)
-
-PP = -D_P_=1
-RR = -D_R_=8192
-CC = -D_C_=8
-LL = -D_L_=1
-# If higher parallelism seems to not work in emulation, try 'export DPCPP_CPU_NUM_CUS=...'
-
-# Defines what aggregation operation is being performed
-#	0 DYNAMIC
-#	1 SUM/Avg/Cnt ONLY
-#	2 Min ONLY
-#	3 Max ONLY
-AGG_OP = -DAGG_OP=0
-
-WHICH = -DWHICH=0
-
-CONFIG = $(PP) $(RR) $(CC) $(LL) $(AGG_OP)
-
+GEMMF = build/gemm_$(VERSION)_fpgaG_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
+GEMMP = build/gemm_$(VERSION)_vTune_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
+GEMMH = build/gemm_$(VERSION)_hw_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
 
 BOARD_PACKAGE = $(OFS_BSP_BASE)
 TARGET = ofs_n6001
 # TARGET = ofs_n6001_usm
 # TARGET = ofs_n6001_iopipes
+
+MATDIM = -DMATDIM=512
+TILE_A = -DTILE_A=32
+TILE_B = -DTILE_B=32
+DWIDTH = -DDWIDTH=32
+
+REPETITIONS = 1
+
+CONFIG = $(MATDIM) $(TILE_A) $(TILE_B) $(DWIDTH)
 
 MHZ = 650MHz
 
@@ -35,47 +24,30 @@ SEED = 0
 
 EARLY = -fsycl-link=early
 
-SIMULATE = -DNO_MY_ASSERT=0 -DFPGA_EMULATOR=1 -fsycl -fintelfpga -Wall -Wextra -g -O0 -w #-qactypes 
+SIMULATE = -DFPGA_EMULATOR=1 -fsycl -fintelfpga -Wall -Wextra -g -O0 -w #-fp-model=precise -no-fma #-qactypes 
 
-SYNTHESIS = -DNO_MY_ASSERT=1 -Xsv -fsycl -fintelfpga -DFPGA_HARDWARE=1 -Xshardware -Xsclock=$(MHZ) -Xsseed=$(SEED) -Xsboard-package=$(BOARD_PACKAGE) -Xstarget=$(TARGET) -DIS_BSP -O3 # -qactypes 
+SYNTHESIS = -Xsv -fsycl -fintelfpga -DFPGA_HARDWARE=1 -Xshardware -Xsclock=$(MHZ) -Xsseed=$(SEED) -Xsboard-package=$(BOARD_PACKAGE) -Xstarget=$(TARGET) -DIS_BSP -O3 #-fp-model=precise -no-fma #-qactypes 
 
-RTLSIM = -DNO_MY_ASSERT=1 -Xsv -fsycl -fintelfpga -DFPGA_SIMULATOR=1 -Xssimulation #-Xstarget=$(TARGET) #-DIS_BSP -O3 # -qactypes 
+RTLSIM = -Xsv -fsycl -fintelfpga -DFPGA_SIMULATOR=1 -Xssimulation #-fp-model=precise -no-fma #-qactypes 
 
-AGGSRC = main.cpp
+GEMMSRC = matmul_demo.cpp
+# GEMMSRC = main.cpp
 
-# INCLUDE = -I ../include/
-INCLUDE = -I $(HOME)/Documents/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/include/
+INCLUDE = -I ./include/
+# INCLUDE = -I $(HOME)/Documents/oneAPI-samples/DirectProgramming/C++SYCL_FPGA/include/
 
 sim:
-	icpx $(TIMERUN) $(CONFIG) $(SIMULATE) $(INCLUDE) $(AGGSRC) -o build/agg_sim
-	build/agg_sim > test.txt
+	icpx $(CONFIG) $(SIMULATE) $(INCLUDE) $(GEMMSRC) -o build/gemm_sim
+	build/gemm_sim $(REPETITIONS) > test.txt
 
 rtl:
-	icpx $(TIMERUN) $(CONFIG) $(RTLSIM) $(INCLUDE) $(AGGSRC) -o build/agg_rtl
+	icpx $(CONFIG) $(RTLSIM) $(INCLUDE) $(GEMMSRC) -o build/gemm_rtl
 
 fpga:
-	icpx $(TIMERUN) $(CONFIG) $(SYNTHESIS) $(INCLUDE) $(AGGSRC) -o $(AGGF)
+	icpx $(CONFIG) $(SYNTHESIS) $(INCLUDE) $(GEMMSRC) -o $(GEMMF)
 
 link:
-	icpx $(TIMERUN) $(CONFIG) $(SYNTHESIS) $(EARLY) $(INCLUDE) $(AGGSRC) -o $(AGGH)
+	icpx $(CONFIG) $(SYNTHESIS) $(EARLY) $(INCLUDE) $(GEMMSRC) -o $(GEMMH)
 
 profile: 
-	icpx $(TIMERUN) $(CONFIG) -Xsprofile $(SYNTHESIS) $(INCLUDE) $(AGGSRC) -o $(AGGP)
-
-############# misc ##################
-
-clang:
-	clang-format -i *.cpp *.h
-
-clean:
-	rm -f *#*#* *~ test.txt simplerun
-
-reset:
-	/ofs/ofs-2023.1-1/ofs_init.sh
-
-resetold:
-	/ofs/ofs-2023.1-1/ofs_init_old.sh
-
-query:
-	/ofs/ofs-2023.1-1/ofs_n6001_eval.sh
-
+	icpx $(CONFIG) -Xsprofile $(SYNTHESIS) $(INCLUDE) $(GEMMSRC) -o $(GEMMP)
