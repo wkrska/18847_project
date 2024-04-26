@@ -1,18 +1,18 @@
 VERSION = v1
 
-GEMMF = build/gemm_$(VERSION)_fpgaG_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
-GEMMP = build/gemm_$(VERSION)_vTune_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
-GEMMH = build/gemm_$(VERSION)_hw_$(MATDIM)_$(TILE_A)_$(TILE_B)_$(DWIDTH)_$(SEED)_$(MHZ)
+GEMMF = build/gemm_$(VERSION)_fpgaG_$(MATDIM)$(TILE_A)$(TILE_B)$(DWIDTH)_$(SEED)_$(MHZ)
+GEMMP = build/gemm_$(VERSION)_vTune_$(MATDIM)$(TILE_A)$(TILE_B)$(DWIDTH)_$(SEED)_$(MHZ)
+GEMMH = build/gemm_$(VERSION)_hw_$(MATDIM)$(TILE_A)$(TILE_B)$(DWIDTH)_$(SEED)_$(MHZ)
 
 BOARD_PACKAGE = $(OFS_BSP_BASE)
 TARGET = ofs_n6001
 # TARGET = ofs_n6001_usm
 # TARGET = ofs_n6001_iopipes
 
-MATDIM = -DMATDIM=512
+MATDIM = -DMATDIM=128
 TILE_A = -DTILE_A=32
 TILE_B = -DTILE_B=32
-DWIDTH = -DDWIDTH=8
+DWIDTH = -DDWIDTH=64
 
 REPETITIONS = 1
 

@@ -54,8 +54,10 @@ void MatmulImpl(sycl::queue &q,            // Device queue
 ) {
   // Number of elements per DDR access
   // NOTE: optimized for single-precision floating-point matrices
-  constexpr int kElemsPerDDRAccess = 8 * sizeof(TT) / 4;
+  // constexpr int kElemsPerDDRAccess = 8 * sizeof(TT) / 4;
+  // constexpr int kElemsPerDDRAccess = 16;
   // constexpr int kElemsPerDDRAccess = 8;
+  constexpr int kElemsPerDDRAccess = 2;
 
   // Matrix sizes
   constexpr int kMatsizeA = rows_a * common;
