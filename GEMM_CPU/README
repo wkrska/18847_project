@@ -1,0 +1,5 @@
+```cmake .``` if you change the CMakeLists.txt
+
+```make``` if you change gemm_cpu.cpp
+
+./gemm_cpu to run
